@@ -1,92 +1,86 @@
 const express = require("express")
 const cors = require("cors")
+const http = require("http")
+const {Server} = require("socket.io")
 
 const app = express()
+const server = http.createServer(app)
+const io = new Server(server,{cors:{origin:"*"}})
+
 app.use(cors())
 app.use(express.json())
 
-let show = null
-let bookings = []
+let show=null
+let seats=[]
 
-function randomSeat(){
+function generateSeats(){
 
-const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-const row = letters[Math.floor(Math.random()*26)]
-const number = Math.floor(Math.random()*14)+1
+seats=[]
 
-return row + number
+const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+for(let r=0;r<26;r++){
+
+for(let n=1;n<=14;n++){
+
+seats.push({
+seat:letters[r]+n,
+booked:false,
+name:null
+})
 
 }
 
-app.get("/ping",(req,res)=>{
-res.json({status:"alive"})
-})
+}
+
+}
 
 app.post("/show",(req,res)=>{
 
 if(show){
-return res.json({error:"show already scheduled"})
+return res.json({error:"show exists"})
 }
 
-const {name,date,time} = req.body
+show=req.body
+generateSeats()
 
-show = {
-name,
-date,
-time
-}
-
-bookings = []
+io.emit("showCreated",show)
 
 res.json({status:"created"})
-
 })
 
 app.get("/show",(req,res)=>{
-
-if(!show){
-return res.json(null)
-}
-
-res.json({
-show,
-bookings
-})
-
+res.json({show,seats})
 })
 
 app.post("/book",(req,res)=>{
 
-if(!show){
-return res.json({error:"no show"})
+const {name}=req.body
+
+const free=seats.filter(s=>!s.booked)
+
+if(free.length===0){
+return res.json({error:"full"})
 }
 
-const name = req.body.name
+const seat=free[Math.floor(Math.random()*free.length)]
 
-const seat = randomSeat()
+seat.booked=true
+seat.name=name
 
-const booking = {
-name,
-seat
-}
+io.emit("seatBooked",seat)
 
-bookings.push(booking)
-
-res.json(booking)
-
+res.json(seat)
 })
 
 app.delete("/show",(req,res)=>{
 
-show = null
-bookings = []
+show=null
+seats=[]
+
+io.emit("showDeleted")
 
 res.json({status:"deleted"})
-
 })
 
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT,()=>{
-console.log("Server running")
-})
+server.listen(process.env.PORT||3000)

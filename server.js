@@ -31,6 +31,7 @@ function generateSeats() {
 app.post("/show", (req, res) => {
   if (show) return res.json({ error: "show exists" });
   show = req.body;
+  console.log(show)
   generateSeats();
   io.emit("showCreated", show);
   res.json({ status: "created" });
